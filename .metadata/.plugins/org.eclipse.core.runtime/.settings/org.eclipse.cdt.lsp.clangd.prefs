@@ -1,0 +1,3 @@
+additional_options=--compile-commands-dir\=C\:\\Users\\crist\\Desktop\\ESP 32 Project\\Code\\BME680\\BME680\\build
+eclipse.preferences.version=1
+query_driver=C\:\\Espressif\\tools\\riscv32-esp-elf\\esp-13.2.0_20230928\\riscv32-esp-elf\\bin\\riscv32-esp-elf-gcc.exe

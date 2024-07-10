@@ -1,0 +1,27 @@
+{
+  "C_Cpp.intelliSenseEngine": "default",
+  "idf.adapterTargetName": "esp32c6",
+  "files.associations": {
+    "string.h": "c",
+    "i2cdev.h": "c",
+    "bme680.h": "c",
+    "esp_system.h": "c",
+    "task.h": "c",
+    "freertos.h": "c",
+    "esp_log.h": "c",
+    "stdbool.h": "c",
+    "esp_mac.h": "c",
+    "nvs_flash.h": "c",
+    "gpio.h": "c",
+    "time.h": "c",
+    "types.h": "c",
+    "esp_rom_sys.h": "c",
+    "semphr.h": "c",
+    "sntp.h": "c",
+    "esp_http_server.h": "c",
+    "esp_wifi.h": "c",
+    "unistd.h": "c"
+  },
+  "idf.portWin": "COM4",
+  "idf.flashType": "UART"
+}
