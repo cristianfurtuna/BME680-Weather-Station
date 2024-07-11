@@ -20,7 +20,8 @@
     "sntp.h": "c",
     "esp_http_server.h": "c",
     "esp_wifi.h": "c",
-    "unistd.h": "c"
+    "unistd.h": "c",
+    "esp_http_client.h": "c"
   },
   "idf.portWin": "COM4",
   "idf.flashType": "UART"
