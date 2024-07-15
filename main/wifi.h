@@ -3,7 +3,7 @@
 
 
 #define WIFI_SSID "SSID"
-#define WIFI_PASS "password"
+#define WIFI_PASS "pass"
 
 void wifi_init_sta(void);
 

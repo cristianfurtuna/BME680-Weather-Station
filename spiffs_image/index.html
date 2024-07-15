@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="refresh" content="10">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f0f0f0;
+            margin: 20px;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        p {
+            color: #555;
+        }
+        a {
+            text-decoration: none;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+    <script>
+        function confirmErase() {
+            if (confirm("Are you sure you want to erase the log?")) {
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        if (xhr.status === 200) {
+                            alert("Log file erased");
+                        } else {
+                            alert("Failed to erase log file");
+                        }
+                    }
+                };
+                xhr.open("GET", "/delete_log", true);
+                xhr.send();
+            } else {
+            }
+        }
+
+        function confirmReinitialize() {
+            if (confirm("Are you sure you want to reinitialize the system?")) {
+                var xhr = new XMLHttpRequest();
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === XMLHttpRequest.DONE) {
+                        if (xhr.status === 200) {
+                            alert("System reinitialized");
+                        } else {
+                            alert("Failed to reinitialize system");
+                        }
+                    }
+                };
+                xhr.open("GET", "/reinitialize", true);
+                xhr.send();
+            } else {
+            }
+        }
+    </script>
+</head>
+<body>
+    <h1>BME680 Sensor Data <br> %d/%.2d/%d  %.2d:%.2d:%.2d </h1>
+    <p>Temperature: %.2f C</p>
+    <p>Humidity: %.2f %%</p>
+    <p>Pressure: %.2f hPa</p>
+    <p>Gas Resistance: %.2f Ohm</p>
+    <a href="/download" target="_blank">
+        <button type="button">Show Log</button>
+    </a>
+    <button type="button" onclick="confirmErase();">Erase Log</button>
+    <button type="button" onclick="confirmReinitialize();">Reinitialize System</button>
+</body>
+</html>

@@ -21,7 +21,10 @@
     "esp_http_server.h": "c",
     "esp_wifi.h": "c",
     "unistd.h": "c",
-    "esp_http_client.h": "c"
+    "esp_http_client.h": "c",
+    "esp_spiffs.h": "c",
+    "cjson.h": "c",
+    "esp_event.h": "c"
   },
   "idf.portWin": "COM4",
   "idf.flashType": "UART"

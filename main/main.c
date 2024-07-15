@@ -1,5 +1,6 @@
 //v0 cod afisare bme680 online in mod STA cu conectare la wifi-ul de acasa, cu timp si refresh odata la 10s al paginii
 //v0.1 adaugat functie de log cu scriere in SPIFFS
+//v0.2 scriere log in ordine de la cel mai nou, transmitere pagina web in chunk-uri, pagina web independenta in spiffs stilizata, cu functii de confirmare a actiunilor, functie de reinitializare
 
 //C
 #include <stdio.h>
@@ -58,27 +59,95 @@ typedef struct {
 
 sensor_data_t sensor_data;
 
-const char *HTML_TEMPLATE = "<html><head><meta http-equiv=\"refresh\" content=\"10\"></head><body>"
-                            "<h1>BME680 Sensor Data <br> %d/%.2d/%d  %.2d:%.2d:%.2d </h1>"
-                            "<p>Temperature: %.2f C</p>"
-                            "<p>Humidity: %.2f %%</p>"
-                            "<p>Pressure: %.2f hPa</p>"
-                            "<p>Gas Resistance: %.2f Ohm</p>"
-                            "<a href=\"/download\" target=\"_blank\"><button type=\"button\">Show Log</button></a>"
-                            "</body></html>";
+esp_err_t reinitialize_handler(httpd_req_t *req)
+{
+    httpd_resp_send(req, "System reinitializing...", HTTPD_RESP_USE_STRLEN);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    esp_restart();
+    
+    return ESP_OK;
+}
+
+httpd_uri_t reinitialize_uri = {
+    .uri      = "/reinitialize",
+    .method   = HTTP_GET,
+    .handler  = reinitialize_handler,
+    .user_ctx = NULL
+};
 
 esp_err_t root_get_handler(httpd_req_t *req)
 {
+
+    FILE *f = fopen("/spiffs/index.html", "r");
+
+    if (f == NULL) {
+        httpd_resp_send_404(req);
+        return ESP_FAIL;
+    }
+
+    fseek(f, 0, SEEK_END);
+    long file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char *buffer = malloc(file_size + 1);
+    if (buffer == NULL) {
+        fclose(f);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+    fread(buffer, 1, file_size, f);
+    buffer[file_size] = '\0';
+    fclose(f);
+
+
     time_t now;
     time(&now);
     struct tm timeinfo;
     localtime_r(&now, &timeinfo);
-    char resp_str[500];
-    snprintf(resp_str, sizeof(resp_str), HTML_TEMPLATE, 
-             timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
+
+    size_t resp_size = snprintf(NULL, 0, buffer,
+             timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, 
+             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
              sensor_data.temperature, sensor_data.humidity,
              sensor_data.pressure, sensor_data.gas_resistance);
-    httpd_resp_send(req, resp_str, strlen(resp_str));
+             
+
+    char *resp_str = malloc(resp_size + 1);
+    if (resp_str == NULL) {
+        free(buffer);
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+
+
+    snprintf(resp_str, resp_size + 1, buffer,
+             timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, 
+             timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec,
+             sensor_data.temperature, sensor_data.humidity,
+             sensor_data.pressure, sensor_data.gas_resistance);
+
+
+    size_t chunk_size = 512; 
+    size_t remaining = strlen(resp_str);
+    char *ptr = resp_str;
+
+    while (remaining > 0) {
+        size_t send_size = (remaining < chunk_size) ? remaining : chunk_size;
+        if (httpd_resp_send_chunk(req, ptr, send_size) != ESP_OK) {
+            free(buffer);
+            free(resp_str);
+            return ESP_FAIL;
+        }
+        ptr += send_size;
+        remaining -= send_size;
+    }
+
+    httpd_resp_send_chunk(req, NULL, 0);
+
+    free(buffer);
+    free(resp_str);
+
     return ESP_OK;
 }
 
@@ -115,6 +184,27 @@ httpd_uri_t download_uri = {
     .user_ctx = NULL
 };
 
+
+esp_err_t delete_log_handler(httpd_req_t *req)
+{
+    FILE* f = fopen("/spiffs/sensor_data.txt", "w");
+    if (f == NULL) {
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    fclose(f);
+    httpd_resp_send(req, "Log file erased", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+httpd_uri_t delete_log_uri = {
+    .uri      = "/delete_log",
+    .method   = HTTP_GET,
+    .handler  = delete_log_handler,
+    .user_ctx = NULL
+};
+
+
 void start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -123,19 +213,54 @@ void start_webserver(void)
     if (httpd_start(&server, &config) == ESP_OK) {
         httpd_register_uri_handler(server, &root_uri);
         httpd_register_uri_handler(server, &download_uri);
+        httpd_register_uri_handler(server, &delete_log_uri);
+        httpd_register_uri_handler(server, &reinitialize_uri);
     }
 }
 
 void write_data_to_file(const char *data)
 {
-    FILE* f = fopen("/spiffs/sensor_data.txt", "a");
+    FILE* f = fopen("/spiffs/sensor_data.txt", "r");
     if (f == NULL) {
-        ESP_LOGE("SPIFFS", "Failed to open file for writing");
+        ESP_LOGE("SPIFFS", "Failed to open file for reading");
+        f = fopen("/spiffs/sensor_data.txt", "w");
+        if (f == NULL) {
+            ESP_LOGE("SPIFFS", "Failed to create file for writing");
+            return;
+        }
+        fprintf(f, "%s\n", data);
+        fclose(f);
         return;
     }
-    fprintf(f, "%s\n", data);
+
+    fseek(f, 0, SEEK_END);
+    long file_size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    char* buffer = (char*)malloc(file_size + 1);
+    if (buffer == NULL) {
+        ESP_LOGE("SPIFFS", "Failed to allocate memory");
+        fclose(f);
+        return;
+    }
+
+    fread(buffer, 1, file_size, f);
+    buffer[file_size] = '\0';
     fclose(f);
+
+    f = fopen("/spiffs/sensor_data.txt", "w");
+    if (f == NULL) {
+        ESP_LOGE("SPIFFS", "Failed to open file for writing");
+        free(buffer);
+        return;
+    }
+
+    fprintf(f, "%s\n%s", data, buffer);
+    fclose(f);
+
+    free(buffer);
 }
+
 
 void bme680_test(void *pvParameters)
 {
@@ -172,7 +297,7 @@ void bme680_test(void *pvParameters)
 
                 TickType_t current_tick = xTaskGetTickCount();
 
-                if (current_tick - last_data_write >= pdMS_TO_TICKS(120000))
+                if (current_tick - last_data_write >= pdMS_TO_TICKS(300000))
                 {
                     time_t now;
                     time(&now);
@@ -199,7 +324,7 @@ void bme680_test(void *pvParameters)
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(10));
     }
 }
 
@@ -243,10 +368,10 @@ void app_main(void)
 
     spiffs_init();
     wifi_init_sta();
+    start_webserver();
     initialize_sntp();
     set_timezone();
     obtain_time();
-    start_webserver();
     xTaskCreatePinnedToCore(bme680_test, "bme680_test", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, APP_CPU_NUM);
 
 }
