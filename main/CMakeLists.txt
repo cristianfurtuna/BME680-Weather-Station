@@ -2,7 +2,7 @@
 # for more information about component CMakeLists.txt files.
 
 idf_component_register(
-    SRCS main.c  wifi.c  timesetup.c   # list the source files of this component
+    SRCS main.c  wifi.c  timesetup.c led_builtin.c  # list the source files of this component
     INCLUDE_DIRS       "." # optional, add here public include directories
     
 )

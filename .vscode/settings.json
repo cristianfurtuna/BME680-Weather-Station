@@ -24,8 +24,15 @@
     "esp_http_client.h": "c",
     "esp_spiffs.h": "c",
     "cjson.h": "c",
-    "esp_event.h": "c"
+    "esp_event.h": "c",
+    "esp_heap_caps.h": "c",
+    "multi_heap.h": "c",
+    "waterfall.h": "c",
+    "rainbow.h": "c",
+    "plasma_waves.h": "c",
+    "led_strip.h": "c",
+    "led_builtin.h": "c"
   },
-  "idf.portWin": "COM4",
+  "idf.portWin": "COM3",
   "idf.flashType": "UART"
 }

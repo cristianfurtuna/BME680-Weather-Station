@@ -17,6 +17,9 @@
 #include <esp_system.h>
 #include "esp_spiffs.h"
 #include <i2cdev.h>
+#include "esp_heap_caps.h"
+#include "led_builtin.h"
+#include "led_strip.h"
 
 //wifi
 #include "esp_wifi.h"
@@ -119,7 +122,6 @@ esp_err_t root_get_handler(httpd_req_t *req)
         httpd_resp_send_500(req);
         return ESP_FAIL;
     }
-
 
     snprintf(resp_str, resp_size + 1, buffer,
              timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, 
@@ -254,7 +256,8 @@ void write_data_to_file(const char *data)
         free(buffer);
         return;
     }
-
+    ESP_LOGI("Heap Info", "Free heap size: %lu bytes", esp_get_free_heap_size());
+    ESP_LOGI("Heap Info", "Minimum free heap size: %lu bytes", esp_get_minimum_free_heap_size());
     fprintf(f, "%s\n%s", data, buffer);
     fclose(f);
 
@@ -366,8 +369,10 @@ void app_main(void)
     ESP_ERROR_CHECK(i2cdev_init());
     ESP_ERROR_CHECK(nvs_flash_init());
 
+
     spiffs_init();
     wifi_init_sta();
+    initialize_mdns();
     start_webserver();
     initialize_sntp();
     set_timezone();
