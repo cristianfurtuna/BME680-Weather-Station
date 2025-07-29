@@ -2,8 +2,8 @@
 #define WIFI_H
 
 
-#define WIFI_SSID "ssid"
-#define WIFI_PASS "pass"
+#define WIFI_SSID "SSID"
+#define WIFI_PASS "PASS"
 
 #define AP_SSID "BME680 Weather Station"
 #define AP_PASS "123456789"

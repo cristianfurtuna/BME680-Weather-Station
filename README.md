@@ -12,3 +12,7 @@ v0.2 Updated webpage with some css and javascript confirmation functions and mig
 
 v0.3 Added lights (for the builtin LED, red blinking - connecting to WiFi, green - connected to WiFi, blue - SoftAP mode), added SoftAP mode if the ESP can't find the desired WiFi station, added hostname using mDNS for an easier access to the webpage
 
+v0.3.1 Bug fixes regarding SoftAP mode.
+
+v0.3.2 Code reorganization.
+

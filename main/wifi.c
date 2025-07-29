@@ -1,4 +1,4 @@
-//wifi
+// wifi
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
@@ -14,46 +14,67 @@
 #include "led_builtin.h"
 #include "mdns.h"
 
+// to solve: try to reconnect to station after initializing softap
 
 #define CONNECT_TIMEOUT_MS 10000
+#define MAX_RETRY 10
 
+static int retry_count = 0;
 static const char *TAG = "wifi softAP";
 static TaskHandle_t wifi_timeout_task_handle = NULL;
 static bool wifi_connected = false;
+static bool softap_initialized = false;
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base,
                                int32_t event_id, void *event_data)
 {
     if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START)
-    {   
+    {
         esp_wifi_connect();
-        if (led_blink_task_handle == NULL) {
+        if (led_blink_task_handle == NULL)
+        {
             xTaskCreate(led_blink_red, "led_blink_task", 2048, NULL, 5, &led_blink_task_handle);
         }
+        wifi_connected = false;
     }
     else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED)
     {
-        esp_wifi_connect();
-        ESP_LOGI("wifi", "Retry to connect to the AP");
-        if (led_blink_task_handle == NULL) {
-        xTaskCreate(led_blink_red, "led_blink_task", 2048, NULL, 5, &led_blink_task_handle);
+        if (retry_count < MAX_RETRY)
+        {
+            esp_wifi_connect();
+            ESP_LOGI(TAG, "Retrying to connect to the AP, attempt %d", ++retry_count);
         }
+        else if (!softap_initialized)
+        {
+            ESP_LOGI(TAG, "Max retries reached, switching to SoftAP mode");
+            vTaskDelete(led_blink_task_handle);
+            wifi_init_softap();
+            softap_initialized = true;
+        }
+        if (led_blink_task_handle == NULL)
+        {
+            xTaskCreate(led_blink_red, "led_blink_task", 2048, NULL, 5, &led_blink_task_handle);
+        }
+        wifi_connected = false;
     }
     else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP)
     {
         ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
         ESP_LOGI("wifi", "got ip:" IPSTR, IP2STR(&event->ip_info.ip));
 
-        if (led_blink_task_handle != NULL) {
+        if (led_blink_task_handle != NULL)
+        {
             vTaskDelete(led_blink_task_handle);
             led_blink_task_handle = NULL;
         }
 
-        led_builtin_color(green, 128);
+        led_builtin_color(green, 64);
         vTaskDelay(pdMS_TO_TICKS(3000));
-        led_builtin_color(green, 10);
+        led_builtin_color(green, 1);
         wifi_connected = true;
-        if (wifi_timeout_task_handle != NULL) {
+        retry_count = 0;
+        if (wifi_timeout_task_handle != NULL)
+        {
             vTaskDelete(wifi_timeout_task_handle);
             wifi_timeout_task_handle = NULL;
         }
@@ -64,13 +85,13 @@ static void wifi_timeout_task(void *pvParameter)
 {
     vTaskDelay(pdMS_TO_TICKS(CONNECT_TIMEOUT_MS));
 
-    if (!wifi_connected) {
+    if (!wifi_connected)
+    {
         ESP_LOGI("wifi", "Connection timeout, switching to SoftAP mode");
         vTaskDelete(led_blink_task_handle);
         wifi_init_softap();
     }
-
-    vTaskDelete(NULL);
+    vTaskDelete(wifi_timeout_task_handle);
 }
 
 void wifi_init_sta()
@@ -110,7 +131,6 @@ void wifi_init_sta()
     xTaskCreate(wifi_timeout_task, "wifi_timeout_task", 4096, NULL, 5, &wifi_timeout_task_handle);
 }
 
-
 void wifi_init_softap(void)
 {
     // ESP_ERROR_CHECK(esp_netif_init());
@@ -139,11 +159,12 @@ void wifi_init_softap(void)
             .authmode = WIFI_AUTH_WPA2_PSK,
 #endif
             .pmf_cfg = {
-                    .required = true,
+                .required = true,
             },
         },
     };
-    if (strlen(AP_PASS) == 0) {
+    if (strlen(AP_PASS) == 0)
+    {
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
     }
 
@@ -154,15 +175,15 @@ void wifi_init_softap(void)
     ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
              wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
 
-    led_builtin_color (blue, 128);
+    led_builtin_color(blue, 128);
     vTaskDelay(pdMS_TO_TICKS(3000));
-    led_builtin_color (blue, 10);  
+    led_builtin_color(blue, 1);
 }
 
-void initialize_mdns() {
+void initialize_mdns()
+{
     ESP_ERROR_CHECK(mdns_init());
     ESP_ERROR_CHECK(mdns_hostname_set("esp32"));
     ESP_ERROR_CHECK(mdns_instance_name_set("ESP32 Web Server"));
     ESP_ERROR_CHECK(mdns_service_add("namedns", "_http", "_tcp", 80, NULL, 0));
 }
-

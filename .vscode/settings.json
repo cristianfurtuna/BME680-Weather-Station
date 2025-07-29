@@ -2,6 +2,7 @@
   "C_Cpp.intelliSenseEngine": "default",
   "idf.adapterTargetName": "esp32c6",
   "files.associations": {
+    "*.v": "verilog",
     "string.h": "c",
     "i2cdev.h": "c",
     "bme680.h": "c",
@@ -31,7 +32,8 @@
     "rainbow.h": "c",
     "plasma_waves.h": "c",
     "led_strip.h": "c",
-    "led_builtin.h": "c"
+    "led_builtin.h": "c",
+    "cstdlib": "c"
   },
   "idf.portWin": "COM3",
   "idf.flashType": "UART"
