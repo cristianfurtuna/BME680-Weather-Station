@@ -12,6 +12,7 @@ typedef struct {
 extern sensor_data_t sensor_data;
 
 void start_webserver(void);
-void update_sensor_data(float temp, float hum, float press, float gas);
+void websocket_broadcast_task(void *arg);
+//void update_sensor_data(float temp, float hum, float press, float gas);
 
 #endif

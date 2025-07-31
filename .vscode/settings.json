@@ -33,8 +33,9 @@
     "plasma_waves.h": "c",
     "led_strip.h": "c",
     "led_builtin.h": "c",
-    "cstdlib": "c"
+    "cstdlib": "c",
+    "web_server.h": "c"
   },
-  "idf.portWin": "COM3",
+  "idf.portWin": "COM8",
   "idf.flashType": "UART"
 }

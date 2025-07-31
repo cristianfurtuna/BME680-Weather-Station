@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta http-equiv="refresh" content="10">
+    <meta charset="UTF-8">
+    <title>BME680 Sensor Data</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -14,9 +15,13 @@
         }
         p {
             color: #555;
+            font-size: 1.2em;
         }
-        a {
-            text-decoration: none;
+        .sensor {
+            margin-bottom: 10px;
+        }
+        a, button {
+            margin: 5px;
         }
         button {
             background-color: #4CAF50;
@@ -24,59 +29,88 @@
             padding: 10px 20px;
             border: none;
             cursor: pointer;
+            border-radius: 5px;
         }
         button:hover {
             background-color: #45a049;
         }
     </style>
-    <script>
-        function confirmErase() {
-            if (confirm("Are you sure you want to erase the log?")) {
-                var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === XMLHttpRequest.DONE) {
-                        if (xhr.status === 200) {
-                            alert("Log file erased");
-                        } else {
-                            alert("Failed to erase log file");
-                        }
-                    }
-                };
-                xhr.open("GET", "/delete_log", true);
-                xhr.send();
-            } else {
-            }
-        }
-
-        function confirmReinitialize() {
-            if (confirm("Are you sure you want to reinitialize the system?")) {
-                var xhr = new XMLHttpRequest();
-                xhr.onreadystatechange = function() {
-                    if (xhr.readyState === XMLHttpRequest.DONE) {
-                        if (xhr.status === 200) {
-                            alert("System reinitialized");
-                        } else {
-                            alert("Failed to reinitialize system");
-                        }
-                    }
-                };
-                xhr.open("GET", "/reinitialize", true);
-                xhr.send();
-            } else {
-            }
-        }
-    </script>
 </head>
 <body>
-    <h1>BME680 Sensor Data <br> %d/%.2d/%d  %.2d:%.2d:%.2d </h1>
-    <p>Temperature: %.2f C</p>
-    <p>Humidity: %.2f %%</p>
-    <p>Pressure: %.2f hPa</p>
-    <p>Gas Resistance: %.2f Ohm</p>
+    <h1>BME680 Sensor Data</h1>
+    <div id="time" class="sensor">Timestamp: -</div>
+    <div id="temp" class="sensor">Temperature: - °C</div>
+    <div id="hum" class="sensor">Humidity: - %</div>
+    <div id="press" class="sensor">Pressure: - hPa</div>
+    <div id="gas" class="sensor">Gas Resistance: - Ohm</div>
+
     <a href="/download" target="_blank">
         <button type="button">Show Log</button>
     </a>
-    <button type="button" onclick="confirmErase();">Erase Log</button>
-    <button type="button" onclick="confirmReinitialize();">Reinitialize System</button>
+    <button onclick="confirmErase()">Erase Log</button>
+    <button onclick="confirmReinitialize()">Reinitialize System</button>
+
+    <script>
+    const timeEl = document.getElementById("time");
+    const tempEl = document.getElementById("temp");
+    const humEl = document.getElementById("hum");
+    const pressEl = document.getElementById("press");
+    const gasEl = document.getElementById("gas");
+
+    let ws;
+    let retryDelay = 1000; 
+    const maxDelay = 10000;
+
+    function connectWebSocket() {
+        ws = new WebSocket(`ws://${location.host}/ws`);
+
+        ws.onopen = () => {
+            console.log("WebSocket connected");
+            retryDelay = 1000; 
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                timeEl.textContent = `Timestamp: ${data.timestamp ?? '-'}`;
+                tempEl.textContent = `Temperature: ${data.temperature?.toFixed(2) ?? '-'} °C`;
+                humEl.textContent = `Humidity: ${data.humidity?.toFixed(2) ?? '-'} %`;
+                pressEl.textContent = `Pressure: ${data.pressure?.toFixed(2) ?? '-'} hPa`;
+                gasEl.textContent = `Gas Resistance: ${data.gas_resistance?.toFixed(2) ?? '-'} Ohm`;
+            } catch (e) {
+                console.error("Failed to parse WebSocket data", e);
+            }
+        };
+
+        ws.onclose = () => {
+            console.warn(`WebSocket closed. Retrying in ${retryDelay / 1000}s...`);
+            setTimeout(connectWebSocket, retryDelay);
+            retryDelay = Math.min(retryDelay * 2, maxDelay); 
+        };
+
+        ws.onerror = (err) => {
+            console.error("WebSocket error", err);
+            ws.close();
+        };
+    }
+
+    connectWebSocket();
+
+    function confirmErase() {
+        if (confirm("Are you sure you want to erase the log?")) {
+            fetch("/delete_log").then(res => {
+                alert(res.ok ? "Log file erased" : "Failed to erase log");
+            });
+        }
+    }
+
+    function confirmReinitialize() {
+        if (confirm("Are you sure you want to reinitialize the system?")) {
+            fetch("/reinitialize").then(res => {
+                alert(res.ok ? "System reinitialized" : "Failed to reinitialize system");
+            });
+        }
+    }
+</script>
 </body>
 </html>

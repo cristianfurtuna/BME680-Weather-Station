@@ -16,3 +16,5 @@ v0.3.1 Bug fixes regarding SoftAP mode.
 
 v0.3.2 Code reorganization.
 
+v0.4   Migration to Websockets
+

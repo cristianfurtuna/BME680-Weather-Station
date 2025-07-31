@@ -5,6 +5,7 @@
 //     adaugat mod AccessPoint daca statia wifi nu este gasita in timpul configurat, adaugat hostname (esp32.local) prin mDNS pentru a evita utilizarea adresei IP
 //v0.3.1 reparat bug-uri softAP (resetare la 10 secunde sistem si neinitializare softAP la deconectarea de la statie)
 //v0.3.2 reorganizare cod
+//v0.4 migrare transmitere date prin websockets
 
 //C
 #include <stdio.h>
@@ -12,7 +13,7 @@
 #include <unistd.h>
 #include <string.h>
 
-//functionalitati hardware-software si drivere
+//functionalitati hardware-soft ware si drivere
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "driver/gpio.h"
@@ -73,11 +74,11 @@ void bme680_test(void *pvParameters)
 
     ESP_ERROR_CHECK(bme680_init_desc(&sensor, ADDR, PORT, SDA_GPIO, SCL_GPIO));
     ESP_ERROR_CHECK(bme680_init_sensor(&sensor));
-    bme680_set_oversampling_rates(&sensor, BME680_OSR_4X, BME680_OSR_4X, BME680_OSR_4X);
-    bme680_set_filter_size(&sensor, BME680_IIR_SIZE_7);
-    bme680_set_heater_profile(&sensor, 0, 0, 0);
-    bme680_use_heater_profile(&sensor, 0);
-//  bme680_set_ambient_temperature(&sensor, 10);
+    bme680_set_oversampling_rates(&sensor, BME680_OSR_1X, BME680_OSR_1X, BME680_OSR_1X);
+    bme680_set_filter_size(&sensor, BME680_IIR_SIZE_3);
+//  bme680_set_heater_profile(&sensor, 0, 0, 0);
+    bme680_use_heater_profile(&sensor, -1);
+//  bme680_set_ambient_temperature(&sensor, 25);
 
     uint32_t duration;
     bme680_get_measurement_duration(&sensor, &duration);
@@ -101,7 +102,7 @@ void bme680_test(void *pvParameters)
 
                 TickType_t current_tick = xTaskGetTickCount();
 
-                if (current_tick - last_data_write >= pdMS_TO_TICKS(300000))
+                if (current_tick - last_data_write >= pdMS_TO_TICKS(300002))
                 {
                     time_t now;
                     time(&now);
@@ -114,7 +115,7 @@ void bme680_test(void *pvParameters)
                     last_data_write = current_tick;
                 }
 
-                if (current_tick - last_console_report >= pdMS_TO_TICKS(1000))
+                if (current_tick - last_console_report >= pdMS_TO_TICKS(1003))
                 {
                     time_t now;
                     time(&now);
@@ -128,7 +129,7 @@ void bme680_test(void *pvParameters)
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(10));
+        vTaskDelay(pdMS_TO_TICKS(15));
     }
 }
 
@@ -147,6 +148,5 @@ void app_main(void)
     initialize_sntp();
     set_timezone();
     obtain_time();
-    xTaskCreatePinnedToCore(bme680_test, "bme680_test", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL, APP_CPU_NUM);
-
+    xTaskCreate(bme680_test, "bme680_test", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL);
 }
