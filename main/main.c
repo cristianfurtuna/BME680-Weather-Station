@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include <string.h>
 
-//functionalitati hardware-soft ware si drivere
+//functionalitati hardware-software si drivere
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "driver/gpio.h"
@@ -25,6 +25,7 @@
 #include "esp_heap_caps.h"
 #include "led_builtin.h"
 #include "led_strip.h"
+#include "driver/temperature_sensor.h"
 
 //wifi
 #include "esp_wifi.h"

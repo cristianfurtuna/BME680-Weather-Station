@@ -112,5 +112,26 @@
         }
     }
 </script>
+
+<h2>WiFi Configuration</h2>
+<label>SSID:</label><input type="text" id="ssid"><br>
+<label>Password:</label><input type="password" id="password"><br>
+<button onclick="submitWifiConfig()">Set WiFi</button>
+
+<script>
+function submitWifiConfig() {
+    const ssid = document.getElementById("ssid").value;
+    const password = document.getElementById("password").value;
+
+    fetch("/set_wifi", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ssid, password })
+    }).then(res => {
+        alert(res.ok ? "WiFi credentials saved. Rebooting..." : "Failed to save WiFi credentials.");
+    });
+}
+</script>
+
 </body>
 </html>

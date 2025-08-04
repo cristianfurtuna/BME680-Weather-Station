@@ -8,6 +8,10 @@
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "timesetup.h"
+#include <nvs_flash.h>
+#include "nvs.h"
+#include "cJSON.h"
+
 
 #define MAX_CLIENTS 8
 
@@ -211,6 +215,44 @@ static httpd_uri_t delete_log_uri = {
     .user_ctx = NULL
 };
 
+esp_err_t set_wifi_handler(httpd_req_t *req) {
+    char buf[128];
+    int ret = httpd_req_recv(req, buf, MIN(req->content_len, sizeof(buf) - 1));
+    if (ret <= 0) return ESP_FAIL;
+
+    buf[ret] = 0;
+
+    cJSON *json = cJSON_Parse(buf);
+    if (!json) return ESP_FAIL;
+
+    const cJSON *ssid = cJSON_GetObjectItem(json, "ssid");
+    const cJSON *password = cJSON_GetObjectItem(json, "password");
+
+    if (ssid && password && ssid->valuestring && password->valuestring) {
+        nvs_handle_t nvs;
+        ESP_ERROR_CHECK(nvs_open("wifi_creds", NVS_READWRITE, &nvs));
+        ESP_ERROR_CHECK(nvs_set_str(nvs, "ssid", ssid->valuestring));
+        ESP_ERROR_CHECK(nvs_set_str(nvs, "pass", password->valuestring));
+        ESP_ERROR_CHECK(nvs_commit(nvs));
+        nvs_close(nvs);
+        cJSON_Delete(json);
+
+        esp_restart();  // reboot after storing credentials
+        return ESP_OK;
+    }
+
+    cJSON_Delete(json);
+    return ESP_FAIL;
+}
+
+httpd_uri_t set_wifi_uri = {
+    .uri = "/set_wifi",
+    .method = HTTP_POST,
+    .handler = set_wifi_handler
+};
+
+
+
 // Start HTTP/WebSocket Server
 void start_webserver(void) {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -225,6 +267,7 @@ void start_webserver(void) {
         httpd_register_uri_handler(server, &delete_log_uri);
         httpd_register_uri_handler(server, &reinitialize_uri);
         httpd_register_uri_handler(server, &ws_uri);
+        httpd_register_uri_handler(server, &set_wifi_uri);
     }
 
     xTaskCreate(websocket_broadcast_task, "ws_broadcast", 4096, NULL, 5, NULL);

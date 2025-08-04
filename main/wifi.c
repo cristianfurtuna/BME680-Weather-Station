@@ -13,6 +13,8 @@
 #include <i2cdev.h>
 #include "led_builtin.h"
 #include "mdns.h"
+#include "nvs_flash.h"
+#include "nvs.h"
 
 // to solve: try to reconnect to station after initializing softap
 
@@ -117,19 +119,35 @@ void wifi_init_sta()
                                                         NULL,
                                                         &instance_got_ip));
 
-    wifi_config_t wifi_config = {
-        .sta = {
-            .ssid = WIFI_SSID,
-            .password = WIFI_PASS,
-            .threshold.authmode = WIFI_AUTH_WPA2_PSK,
-        },
-    };
+    
+    wifi_config_t wifi_config = {0};
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open("wifi_creds", NVS_READONLY, &nvs);
+    if (err == ESP_OK) {
+        size_t ssid_len = sizeof(wifi_config.sta.ssid);
+        size_t pass_len = sizeof(wifi_config.sta.password);
+        if (nvs_get_str(nvs, "ssid", (char *)wifi_config.sta.ssid, &ssid_len) != ESP_OK ||
+            nvs_get_str(nvs, "pass", (char *)wifi_config.sta.password, &pass_len) != ESP_OK) {
+            ESP_LOGW("WiFi", "Failed to get SSID or password, using defaults");
+            strcpy((char *)wifi_config.sta.ssid, DEFAULT_WIFI_SSID);
+            strcpy((char *)wifi_config.sta.password, DEFAULT_WIFI_PASS);
+        }
+        nvs_close(nvs);
+    } else {
+        ESP_LOGW("WiFi", "No stored credentials, using defaults");
+        strcpy((char *)wifi_config.sta.ssid, DEFAULT_WIFI_SSID);
+        strcpy((char *)wifi_config.sta.password, DEFAULT_WIFI_PASS);
+    }
+
+    wifi_config.sta.threshold.authmode = WIFI_AUTH_WPA2_PSK;
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_STA, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
+
     xTaskCreate(wifi_timeout_task, "wifi_timeout_task", 4096, NULL, 5, &wifi_timeout_task_handle);
 }
+
 
 void wifi_init_softap(void)
 {

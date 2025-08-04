@@ -18,3 +18,6 @@ v0.3.2 Code reorganization.
 
 v0.4   Migration to Websockets
 
+v0.5   WiFi SSID and password change integrated in webpage
+
+

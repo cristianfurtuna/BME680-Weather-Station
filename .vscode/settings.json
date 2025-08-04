@@ -34,7 +34,8 @@
     "led_strip.h": "c",
     "led_builtin.h": "c",
     "cstdlib": "c",
-    "web_server.h": "c"
+    "web_server.h": "c",
+    "wifi.h": "c"
   },
   "idf.portWin": "COM8",
   "idf.flashType": "UART"
