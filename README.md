@@ -20,4 +20,6 @@ v0.4   Migration to Websockets
 
 v0.5   WiFi SSID and password change integrated in webpage
 
+v1.0   SoftAP SSID, password change and authmode integrated in webpage
+
 

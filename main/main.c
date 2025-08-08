@@ -6,6 +6,8 @@
 //v0.3.1 reparat bug-uri softAP (resetare la 10 secunde sistem si neinitializare softAP la deconectarea de la statie)
 //v0.3.2 reorganizare cod
 //v0.4 migrare transmitere date prin websockets
+//v0.5 configurare SSID si Parola WiFi on the go din webpage
+//v1.0 configurare SSID, Parola si authmode SoftAP on the go din webpage
 
 //C
 #include <stdio.h>
@@ -77,9 +79,9 @@ void bme680_test(void *pvParameters)
     ESP_ERROR_CHECK(bme680_init_sensor(&sensor));
     bme680_set_oversampling_rates(&sensor, BME680_OSR_1X, BME680_OSR_1X, BME680_OSR_1X);
     bme680_set_filter_size(&sensor, BME680_IIR_SIZE_3);
-//  bme680_set_heater_profile(&sensor, 0, 0, 0);
+    //bme680_set_heater_profile(&sensor, 0, 0, 0);
     bme680_use_heater_profile(&sensor, -1);
-//  bme680_set_ambient_temperature(&sensor, 25);
+    //bme680_set_ambient_temperature(&sensor, 25);
 
     uint32_t duration;
     bme680_get_measurement_duration(&sensor, &duration);

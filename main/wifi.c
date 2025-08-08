@@ -16,7 +16,6 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 
-// to solve: try to reconnect to station after initializing softap
 
 #define CONNECT_TIMEOUT_MS 10000
 #define MAX_RETRY 10
@@ -151,8 +150,10 @@ void wifi_init_sta()
 
 void wifi_init_softap(void)
 {
-    // ESP_ERROR_CHECK(esp_netif_init());
-    // ESP_ERROR_CHECK(esp_event_loop_create_default());
+    char ssid[32] = {0};
+    char password[64] = {0};
+    
+
     esp_netif_create_default_wifi_ap();
 
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
@@ -164,34 +165,75 @@ void wifi_init_softap(void)
                                                         NULL,
                                                         NULL));
 
+    int authmode = DEFAULT_SOFTAP_AUTHMODE;
+    strcpy(ssid, DEFAULT_SOFTAP_SSID);
+    strcpy(password, DEFAULT_SOFTAP_PASS);
+
+    // Try reading from NVS and override if present
+    nvs_handle_t nvs_handle;
+    esp_err_t err = nvs_open("softap_creds", NVS_READONLY, &nvs_handle);
+    if (err == ESP_OK)
+    {
+        size_t ssid_len = sizeof(ssid);
+        size_t pass_len = sizeof(password);
+        if (nvs_get_str(nvs_handle, "ssid", ssid, &ssid_len) != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Using default SoftAP SSID");
+            strcpy(ssid, DEFAULT_SOFTAP_SSID);
+        }
+        if (nvs_get_str(nvs_handle, "pass", password, &pass_len) != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Using default SoftAP password");
+            strcpy(password, DEFAULT_SOFTAP_PASS);
+        }
+        if (nvs_get_i32(nvs_handle, "authmode", &authmode) != ESP_OK)
+        {
+            ESP_LOGW(TAG, "Using default SoftAP authmode");
+            authmode = DEFAULT_SOFTAP_AUTHMODE;
+        }
+        nvs_close(nvs_handle);
+    }
+
     wifi_config_t wifi_config = {
         .ap = {
-            .ssid = AP_SSID,
-            .ssid_len = strlen(AP_SSID),
-            .password = AP_PASS,
+            .ssid_len = strlen(ssid),
             .max_connection = 4,
-#ifdef CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT
-            .authmode = WIFI_AUTH_WPA3_PSK,
-            .sae_pwe_h2e = WPA3_SAE_PWE_BOTH,
-#else /* CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT */
-            .authmode = WIFI_AUTH_WPA2_PSK,
-#endif
             .pmf_cfg = {
                 .required = true,
             },
         },
     };
-    if (strlen(AP_PASS) == 0)
-    {
+
+    strncpy((char *)wifi_config.ap.ssid, ssid, sizeof(wifi_config.ap.ssid) - 1);
+    wifi_config.ap.ssid[sizeof(wifi_config.ap.ssid) - 1] = '\0';  // Ensure null-terminated
+    wifi_config.ap.ssid_len = strlen((char *)wifi_config.ap.ssid);
+
+
+    // Handle open auth or too short passwords
+    if (strlen(password) == 0 || authmode == WIFI_AUTH_OPEN || strlen(password) < 8) {
+        ESP_LOGW(TAG, "Password too short (%d), using open auth", strlen(password));
         wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+        memset(wifi_config.ap.password, 0, sizeof(wifi_config.ap.password));  // Clear password
+    } else {
+        wifi_config.ap.authmode = authmode;
+        strncpy((char *)wifi_config.ap.password, password, sizeof(wifi_config.ap.password));
     }
+
+    strncpy((char *)wifi_config.ap.ssid, ssid, sizeof(wifi_config.ap.ssid));
+
+
+#ifdef CONFIG_ESP_WIFI_SOFTAP_SAE_SUPPORT
+    if (wifi_config.ap.authmode == WIFI_AUTH_WPA3_PSK || wifi_config.ap.authmode == WIFI_AUTH_WPA2_WPA3_PSK) {
+        wifi_config.ap.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
+    }
+#endif
 
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
     ESP_ERROR_CHECK(esp_wifi_set_config(WIFI_IF_AP, &wifi_config));
     ESP_ERROR_CHECK(esp_wifi_start());
 
-    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:%s password:%s channel:%d",
-             wifi_config.ap.ssid, wifi_config.ap.password, wifi_config.ap.channel);
+    ESP_LOGI(TAG, "SoftAP started. SSID:%s Password:%s Authmode:%d",
+             ssid, password, authmode);
 
     led_builtin_color(blue, 128);
     vTaskDelay(pdMS_TO_TICKS(3000));
