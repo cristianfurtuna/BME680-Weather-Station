@@ -125,7 +125,6 @@ void websocket_broadcast_task(void *arg)
     }
 }
 
-// Reinitialize Handler
 static esp_err_t reinitialize_handler(httpd_req_t *req)
 {
     httpd_resp_send(req, "System reinitializing...", HTTPD_RESP_USE_STRLEN);
@@ -206,7 +205,7 @@ static httpd_uri_t download_uri = {
     .handler = download_get_handler,
     .user_ctx = NULL};
 
-// Delete Log Handler
+
 static esp_err_t delete_log_handler(httpd_req_t *req)
 {
     FILE *f = fopen("/spiffs/sensor_data.txt", "w");
@@ -302,13 +301,13 @@ esp_err_t handle_set_softap(httpd_req_t *req) {
         return ESP_OK;
     }
 
-    // Save to NVS
+  
     nvs_handle_t nvs;
     esp_err_t nvs_err = nvs_open("softap_creds", NVS_READWRITE, &nvs);
     if (nvs_err == ESP_OK) {
         ESP_ERROR_CHECK(nvs_set_str(nvs, "ssid", ssid));
         ESP_ERROR_CHECK(nvs_set_str(nvs, "pass", pass));
-        ESP_ERROR_CHECK(nvs_set_i32(nvs, "authmode", authmode));  // Note: key is "authmode", not "auth"
+        ESP_ERROR_CHECK(nvs_set_i32(nvs, "authmode", authmode)); 
         ESP_ERROR_CHECK(nvs_commit(nvs));
         nvs_close(nvs);
         ESP_LOGI(TAG, "SoftAP credentials saved to NVS");
@@ -333,7 +332,7 @@ esp_err_t handle_erase_softap(httpd_req_t *req) {
         nvs_commit(nvs);
         nvs_close(nvs);
         httpd_resp_sendstr(req, "SoftAP NVS cleared");
-        esp_restart(); // Reboot to reload defaults
+        esp_restart(); 
         return ESP_OK;
     } else {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to erase NVS");
