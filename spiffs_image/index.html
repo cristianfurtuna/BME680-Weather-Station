@@ -186,8 +186,18 @@
         <option value="3" selected>WIFI_AUTH_WPA2_PSK</option>
         <option value="7">WIFI_AUTH_WPA3_PSK</option>
         </select><br>
-
         <button onclick="submitSoftAPConfig()">Apply SoftAP Settings</button>
+        <hr>
+
+        <h3>MQTT Configuration</h3>
+        <label for="mqtt_ip">Broker IP / Host:</label>
+        <input type="text" id="mqtt_ip" placeholder="192.168.1.23"><br>
+
+        <label for="mqtt_port">Port:</label>
+        <input type="number" id="mqtt_port" min="1" max="65535" value="1883"><br>
+        <button onclick="submitMqttConfig()">Set MQTT Broker</button>
+
+        <hr>
         <button onclick="confirmEraseSoftAP()">Default Settings</button>
     </div>
 
@@ -236,6 +246,30 @@
                 });
             }
         }
+
+        function submitMqttConfig() {
+        const ip   = document.getElementById("mqtt_ip").value.trim();
+        const port = parseInt(document.getElementById("mqtt_port").value, 10);
+
+        if (!ip || isNaN(port) || port <= 0 || port > 65535) {
+            alert("Please enter a valid broker IP/host and port (1–65535).");
+            return;
+        }
+
+        fetch("/set_mqtt", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ ip, port })
+        })
+        .then(res => {
+            alert(res.ok
+                  ? "MQTT settings saved. Rebooting..."
+                  : "Failed to save MQTT settings.");
+        })
+        .catch(() => {
+            alert("Request failed.");
+        });
+    }
     </script>
 
 </body>

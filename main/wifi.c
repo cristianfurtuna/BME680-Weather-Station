@@ -89,10 +89,15 @@ static void wifi_timeout_task(void *pvParameter)
     if (!wifi_connected)
     {
         ESP_LOGI("wifi", "Connection timeout, switching to SoftAP mode");
-        vTaskDelete(led_blink_task_handle);
+        if (led_blink_task_handle != NULL) {
+            vTaskDelete(led_blink_task_handle);
+            led_blink_task_handle = NULL;
+        }
         wifi_init_softap();
     }
-    vTaskDelete(wifi_timeout_task_handle);
+
+    wifi_timeout_task_handle = NULL;
+    vTaskDelete(NULL);   // task deletes itself, not via handle
 }
 
 void wifi_init_sta()
@@ -239,6 +244,17 @@ void wifi_init_softap(void)
     vTaskDelay(pdMS_TO_TICKS(3000));
     led_builtin_color(blue, 1);
 }
+
+bool wifi_is_connected(void)
+{
+    return wifi_connected;
+}
+
+bool wifi_is_softap_mode(void)
+{
+    return softap_initialized;
+}
+
 
 void initialize_mdns()
 {

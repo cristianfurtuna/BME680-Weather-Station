@@ -12,5 +12,8 @@
 void wifi_init_sta(void);
 void wifi_init_softap(void);
 void initialize_mdns(void);
+bool wifi_is_connected(void);
+bool wifi_is_softap_mode(void);
+
 
 #endif

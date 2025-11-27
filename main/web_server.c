@@ -24,6 +24,65 @@ sensor_data_t sensor_data;
 static SemaphoreHandle_t clients_mutex;
 static int client_fds[MAX_CLIENTS] = {0};
 
+esp_err_t handle_set_mqtt(httpd_req_t *req)
+{
+    char buf[128];
+    int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (len <= 0) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Empty body");
+        return ESP_OK;
+    }
+    buf[len] = 0;
+
+    cJSON *json = cJSON_Parse(buf);
+    if (!json) {
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON");
+        return ESP_OK;
+    }
+
+    const cJSON *ip_json   = cJSON_GetObjectItem(json, "ip");
+    const cJSON *port_json = cJSON_GetObjectItem(json, "port");
+
+    if (!cJSON_IsString(ip_json) || !cJSON_IsNumber(port_json)) {
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing ip or port");
+        return ESP_OK;
+    }
+
+    const char *ip = ip_json->valuestring;
+    int port = port_json->valueint;
+
+    if (port <= 0 || port > 65535) {
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid port");
+        return ESP_OK;
+    }
+
+    nvs_handle_t nvs;
+    esp_err_t err = nvs_open("mqtt_cfg", NVS_READWRITE, &nvs);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to open NVS for mqtt_cfg: %s", esp_err_to_name(err));
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "NVS open failed");
+        return ESP_OK;
+    }
+
+    ESP_ERROR_CHECK(nvs_set_str(nvs, "ip", ip));
+    ESP_ERROR_CHECK(nvs_set_u16(nvs, "port", (uint16_t)port));
+    ESP_ERROR_CHECK(nvs_commit(nvs));
+    nvs_close(nvs);
+
+    ESP_LOGI(TAG, "MQTT config saved: %s:%d", ip, port);
+
+    cJSON_Delete(json);
+    httpd_resp_sendstr(req, "OK");
+
+    vTaskDelay(pdMS_TO_TICKS(500));
+    esp_restart();   // same pattern as your WiFi config
+    return ESP_OK;
+}
+
+
 static esp_err_t websocket_handler(httpd_req_t *req)
 {
     if (!req)
@@ -46,28 +105,30 @@ static esp_err_t websocket_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
-    httpd_ws_frame_t ws_pkt = {
-        .final = true,
-        .fragmented = false,
-        .type = HTTPD_WS_TYPE_TEXT,
-        .payload = NULL,
-        .len = 0};
+//     httpd_ws_frame_t ws_pkt = {
+//         .final = true,
+//         .fragmented = false,
+//         .type = HTTPD_WS_TYPE_TEXT,
+//         .payload = NULL,
+//         .len = 0};
 
-    esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
-    if (ret != ESP_OK)
-        return ret;
+//     esp_err_t ret = httpd_ws_recv_frame(req, &ws_pkt, 0);
+//     if (ret != ESP_OK)
+//         return ret;
 
-    ws_pkt.payload = malloc(ws_pkt.len + 1);
-    if (!ws_pkt.payload)
-        return ESP_ERR_NO_MEM;
+//     ws_pkt.payload = malloc(ws_pkt.len + 1);
+//     if (!ws_pkt.payload)
+//         return ESP_ERR_NO_MEM;
 
-    ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
-    if (ret == ESP_OK)
-    {
-        ws_pkt.payload[ws_pkt.len] = '\0';
-        ESP_LOGI(TAG, "Received: %s", (char *)ws_pkt.payload);
-    }
-    free(ws_pkt.payload);
+//     ret = httpd_ws_recv_frame(req, &ws_pkt, ws_pkt.len);
+//     if (ret == ESP_OK)
+//     {
+//         ws_pkt.payload[ws_pkt.len] = '\0';
+//         ESP_LOGI(TAG, "Received: %s", (char *)ws_pkt.payload);
+//     }
+//     free(ws_pkt.payload);
+//     return ESP_OK;
+// 
     return ESP_OK;
 }
 
@@ -265,6 +326,14 @@ httpd_uri_t set_wifi_uri = {
     .method = HTTP_POST,
     .handler = set_wifi_handler};
 
+httpd_uri_t set_mqtt_uri = {
+    .uri      = "/set_mqtt",
+    .method   = HTTP_POST,
+    .handler  = handle_set_mqtt,
+    .user_ctx = NULL
+};
+
+
 esp_err_t handle_set_softap(httpd_req_t *req) {
     char buf[256];
     int len = httpd_req_recv(req, buf, sizeof(buf) - 1);
@@ -359,6 +428,7 @@ httpd_uri_t erase_softap_uri = {
 void start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 10;
     httpd_handle_t server = NULL;
 
     clients_mutex = xSemaphoreCreateMutex();
@@ -374,6 +444,7 @@ void start_webserver(void)
         httpd_register_uri_handler(server, &set_wifi_uri);
         httpd_register_uri_handler(server, &softap_set_uri);
         httpd_register_uri_handler(server, &erase_softap_uri);
+        httpd_register_uri_handler(server, &set_mqtt_uri);
     }
 
     xTaskCreate(websocket_broadcast_task, "ws_broadcast", 4096, NULL, 5, NULL);

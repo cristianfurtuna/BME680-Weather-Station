@@ -7,6 +7,7 @@ typedef struct {
     float humidity;
     float pressure;
     float gas_resistance;
+    bool  gas_warning_on;
 } sensor_data_t;
 
 extern sensor_data_t sensor_data;

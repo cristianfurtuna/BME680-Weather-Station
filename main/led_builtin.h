@@ -17,6 +17,8 @@ static rgb_t black = { .r = 0,   .g = 0,   .b = 0};
 static rgb_t red =   { .r = 255, .g = 0,   .b = 0};
 static rgb_t blue =  { .r = 0,   .g = 0,   .b = 255};
 static rgb_t green = { .r = 0,   .g = 255, .b = 0};
+static rgb_t purple = { .r = 255, .g = 0,   .b = 255};
+
 
 void led_builtin_color(rgb_t color, uint8_t brightness);
 void set_brightness (uint8_t brightness);

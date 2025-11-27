@@ -1,21 +1,25 @@
-//v0 cod afisare bme680 online in mod STA cu conectare la wifi-ul de acasa, cu timp si refresh odata la 10s al paginii
-//v0.1 adaugat functie de log cu scriere in SPIFFS
-//v0.2 scriere log in ordine de la cel mai nou, transmitere pagina web in chunk-uri, pagina web independenta in spiffs stilizata, cu functii de confirmare a actiunilor, functie de reinitializare
-//v0.3 adaugat functii pentru led-ul incorporat (rosu - conectare la wifi, verde - conectat la wifi, albastru - mod AP (Access Point)), 
-//     adaugat mod AccessPoint daca statia wifi nu este gasita in timpul configurat, adaugat hostname (esp32.local) prin mDNS pentru a evita utilizarea adresei IP
-//v0.3.1 reparat bug-uri softAP (resetare la 10 secunde sistem si neinitializare softAP la deconectarea de la statie)
-//v0.3.2 reorganizare cod
-//v0.4 migrare transmitere date prin websockets
-//v0.5 configurare SSID si Parola WiFi on the go din webpage
-//v1.0 configurare SSID, Parola si authmode SoftAP on the go din webpage
+// v0 cod afisare bme680 online in mod STA cu conectare la wifi-ul de acasa, cu timp si refresh odata la 10s al paginii
+// v0.1 adaugat functie de log cu scriere in SPIFFS
+// v0.2 scriere log in ordine de la cel mai nou, transmitere pagina web in chunk-uri, pagina web independenta in spiffs stilizata, cu functii de confirmare a actiunilor, functie de reinitializare
+// v0.3 adaugat functii pentru led-ul incorporat (rosu - conectare la wifi, verde - conectat la wifi, albastru - mod AP (Access Point)),
+//      adaugat mod AccessPoint daca statia wifi nu este gasita in timpul configurat, adaugat hostname (esp32.local) prin mDNS pentru a evita utilizarea adresei IP
+// v0.3.1 reparat bug-uri softAP (resetare la 10 secunde sistem si neinitializare softAP la deconectarea de la statie)
+// v0.3.2 reorganizare cod
+// v0.4 migrare transmitere date prin websockets
+// v0.5 configurare SSID si Parola WiFi on the go din webpage
+// v1.0 configurare SSID, Parola si authmode SoftAP on the go din webpage
+// v1.1 adaugat MQTT pentru transmitere date catre broker, cu broker configurabil din webpage
+// v1.2 adaugat functionalitate gas sensor cu detectare a scaderilor bruste de calitate a aerului
+// v1.3 adaugat gas warning status in webpage si mesaj MQTT
 
-//C
+
+// C
 #include <stdio.h>
 #include <stdbool.h>
 #include <unistd.h>
 #include <string.h>
 
-//functionalitati hardware-software si drivere
+// functionalitati hardware-software si drivere
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 #include "driver/gpio.h"
@@ -28,29 +32,29 @@
 #include "led_builtin.h"
 #include "led_strip.h"
 #include "driver/temperature_sensor.h"
+#include "mqtt.h"
 
-//wifi
+// wifi
 #include "esp_wifi.h"
 #include "esp_event.h"
 #include "esp_http_server.h"
 #include "esp_mac.h"
 #include "wifi.h"
 
-//senzor
+// senzor
 #include "bme680.h"
 
-//timp
+// timp
 #include <time.h>
 #include <sys/time.h>
 #include "lwip/apps/sntp.h"
 #include "timesetup.h"
 
-//webserver
+// webserver
 #include "web_server.h"
 
-//filemanagement
+// filemanagement
 #include "file_manager.h"
-
 
 #define I2C_PORT I2C_NUM_0
 #define SDA_GPIO GPIO_NUM_5
@@ -67,8 +71,12 @@
 #if defined(BME680_I2C_ADDR_1)
 #define ADDR BME680_I2C_ADDR_1
 #endif
- 
 
+static float last_gas_resistance = 0.0f;
+static int gas_down_streak = 0;
+static int gas_up_streak = 0;
+static bool gas_warning_on = false;
+static bool gas_led_phase = false; // toggles for blink
 
 void bme680_test(void *pvParameters)
 {
@@ -77,11 +85,11 @@ void bme680_test(void *pvParameters)
 
     ESP_ERROR_CHECK(bme680_init_desc(&sensor, ADDR, PORT, SDA_GPIO, SCL_GPIO));
     ESP_ERROR_CHECK(bme680_init_sensor(&sensor));
-    bme680_set_oversampling_rates(&sensor, BME680_OSR_1X, BME680_OSR_1X, BME680_OSR_1X);
+    bme680_set_oversampling_rates(&sensor, BME680_OSR_4X, BME680_OSR_4X, BME680_OSR_4X);
     bme680_set_filter_size(&sensor, BME680_IIR_SIZE_3);
-    //bme680_set_heater_profile(&sensor, 0, 0, 0);
-    bme680_use_heater_profile(&sensor, -1);
-    //bme680_set_ambient_temperature(&sensor, 25);
+    bme680_set_heater_profile(&sensor, 1, 250, 20);
+    bme680_use_heater_profile(&sensor, 1);
+    bme680_set_ambient_temperature(&sensor, 22);
 
     uint32_t duration;
     bme680_get_measurement_duration(&sensor, &duration);
@@ -102,6 +110,73 @@ void bme680_test(void *pvParameters)
                 sensor_data.humidity = values.humidity;
                 sensor_data.pressure = values.pressure;
                 sensor_data.gas_resistance = values.gas_resistance;
+                sensor_data.gas_warning_on = gas_warning_on;
+
+                float gas = values.gas_resistance;
+                if (gas > 0.0f)
+                {
+
+                    if (last_gas_resistance > 0.0f)
+                    {
+                        float ratio = gas / last_gas_resistance;
+
+                        bool sudden_drop = (ratio < 0.7f); 
+
+                        if (ratio < 0.99f)
+                        {
+                            gas_down_streak++;
+                            gas_up_streak = 0;
+                        }
+                        else if (ratio > 1.00f)
+                        {
+                            gas_up_streak++;
+                            gas_down_streak = 0;
+                        }
+                        else
+                        {
+                            gas_down_streak = 0;
+                            gas_up_streak = 0;
+                        }
+
+                        if (!gas_warning_on &&
+                            (sudden_drop || gas_down_streak >= 5))
+                        {
+                            gas_warning_on = true;
+                        }
+
+                        if (gas_warning_on && gas_up_streak >= 5)
+                        {
+                            gas_warning_on = false;
+                        }
+                    }
+
+                    last_gas_resistance = gas;
+                }
+
+                if (gas_warning_on && (wifi_is_connected() || wifi_is_softap_mode()))
+                {
+                    gas_led_phase = !gas_led_phase;
+                    if (gas_led_phase)
+                    {
+                        led_builtin_color(purple, 64); // purple ON
+                    }
+                    else
+                    {
+                        led_builtin_color(black, 0);  // OFF between blinks
+                    }
+                }
+                else
+                {
+                    gas_led_phase = false;
+                    if (wifi_is_connected())
+                    {
+                        led_builtin_color(green, 1);
+                    }
+                    else if (wifi_is_softap_mode())
+                    {
+                        led_builtin_color(blue, 1);
+                    }
+                }
 
                 TickType_t current_tick = xTaskGetTickCount();
 
@@ -113,7 +188,7 @@ void bme680_test(void *pvParameters)
                     localtime_r(&now, &timeinfo);
                     char data_str[256];
                     snprintf(data_str, sizeof(data_str), "%.2d/%.2d/%d at: %.2d:%.2d:%.2d BME680 Sensor: %.2f C, %.2f %%, %.2f hPa, %.2f Ohm",
-                           timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec, values.temperature, values.humidity, values.pressure, values.gas_resistance);
+                             timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec, values.temperature, values.humidity, values.pressure, values.gas_resistance);
                     write_data_to_file(data_str);
                     last_data_write = current_tick;
                 }
@@ -126,23 +201,22 @@ void bme680_test(void *pvParameters)
                     localtime_r(&now, &timeinfo);
                     char data_str[256];
                     snprintf(data_str, sizeof(data_str), "%.2d/%.2d/%d at: %.2d:%.2d:%.2d BME680 Sensor: %.2f C, %.2f %%, %.2f hPa, %.2f Ohm",
-                           timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec, values.temperature, values.humidity, values.pressure, values.gas_resistance);
+                             timeinfo.tm_mday, timeinfo.tm_mon + 1, timeinfo.tm_year + 1900, timeinfo.tm_hour, timeinfo.tm_min, timeinfo.tm_sec, values.temperature, values.humidity, values.pressure, values.gas_resistance);
                     printf("%s\n", data_str);
                     last_console_report = current_tick;
                 }
             }
         }
-        vTaskDelay(pdMS_TO_TICKS(15));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
 void app_main(void)
 {
-    
+
     esp_log_level_set("bme680", ESP_LOG_ERROR);
     ESP_ERROR_CHECK(i2cdev_init());
     ESP_ERROR_CHECK(nvs_flash_init());
-
 
     spiffs_init();
     wifi_init_sta();
@@ -151,5 +225,6 @@ void app_main(void)
     initialize_sntp();
     set_timezone();
     obtain_time();
+    mqtt_start();
     xTaskCreate(bme680_test, "bme680_test", configMINIMAL_STACK_SIZE * 8, NULL, 5, NULL);
 }
