@@ -22,4 +22,5 @@ v0.5   WiFi SSID and password change integrated in webpage
 
 v1.0   SoftAP SSID, password change and authmode integrated in webpage
 
+v1.3   Added MQTT support with configurable broker on webpage. Added gas resistance support with warnings on VOC detection.
 
