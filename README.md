@@ -26,8 +26,9 @@ v1.0   SoftAP SSID, password change and authmode integrated in webpage
 v1.3   Added MQTT support with configurable broker on webpage. Added gas resistance support with warnings on VOC detection.
 
 Final assembly:
-![Asamblare![Top_view](https://github.com/user-attachments/assets/39387e0b-113d-4c34-be6f-1f4ecdfa3755)
-_finala](https://github.com/user-attachments/assets/65713bdb-93ed-4415-9723-563ea2c2f9e6)
+![Asamblare_finala](https://github.com/user-attachments/assets/3bd48f9a-0ffb-4441-a9b3-8392d7d3a891)
+
+![Top_view](https://github.com/user-attachments/assets/42be98ea-7171-4024-b780-49b23a81ff0b)
 
 Wiring diagram:
 <img width="1974" height="950" alt="Schema_fritzing_bb" src="https://github.com/user-attachments/assets/9ec431bf-4ea8-4210-aafe-41cf0fb33f1d" />
