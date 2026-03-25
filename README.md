@@ -1,9 +1,9 @@
 BME680 weather station
-====================
+======================
 
 Weather station based on an ESP32C6 development module and a BME680 sensor.
-Work in progress
 
+Changelog
 v0.0 Basic Weather station with instant WiFi reading
 
 v0.1 Added log function written as a .txt file in spiffs
@@ -23,4 +23,13 @@ v0.5   WiFi SSID and password change integrated in webpage
 v1.0   SoftAP SSID, password change and authmode integrated in webpage
 
 v1.3   Added MQTT support with configurable broker on webpage. Added gas resistance support with warnings on VOC detection.
+
+Final assembly:
+![Asamblare![Top_view](https://github.com/user-attachments/assets/39387e0b-113d-4c34-be6f-1f4ecdfa3755)
+_finala](https://github.com/user-attachments/assets/65713bdb-93ed-4415-9723-563ea2c2f9e6)
+
+Wiring diagram:
+<img width="1974" height="950" alt="Schema_fritzing_bb" src="https://github.com/user-attachments/assets/9ec431bf-4ea8-4210-aafe-41cf0fb33f1d" />
+
+
 
