@@ -2,6 +2,7 @@ BME680 weather station
 ======================
 
 Weather station based on an ESP32C6 development module and a BME680 sensor.
+The project's main objective is to create an autonomous data aquisition system based on the BME680 that is reconfigurable and uses Wi-Fi connectivity.
 
 Changelog
 v0.0 Basic Weather station with instant WiFi reading
